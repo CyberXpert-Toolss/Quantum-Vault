@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>bit-trade | Plataforma de Trading</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap');
+        
+        :root {
+            --bg-primary: #0a0b0d;
+            --bg-secondary: #131417;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --border-color: #2b2f36;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: #e2e8f0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: var(--bg-primary); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f444e; border-radius: 10px; }
+
+        .chart-container {
+            position: relative;
+            cursor: crosshair;
+            background-color: #0d0e12;
+        }
+
+        .glass {
+            background: rgba(19, 20, 23, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+        }
+
+        #auth-overlay {
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.9);
+        }
+
+        .input-field {
+            background: #1a1b1e;
+            border: 1px solid #2b2f36;
+            color: white;
+            padding: 10px 12px;
+            border-radius: 6px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-field:focus { border-color: #6366f1; }
+        
+        .btn-primary {
+            background: #6366f1;
+            color: white;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: opacity 0.2s;
+        }
+
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .loader {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #6366f1;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .timer-badge {
+            background: rgba(99, 102, 241, 0.2);
+            color: #818cf8;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .timer-badge.urgent {
+            background: rgba(239, 68, 68, 0.4);
+            color: #ffaaaa;
+            animation: pulse 0.5s infinite alternate;
+        }
+        
+        @keyframes pulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.05); background: rgba(239, 68, 68, 0.7); }
+        }
+
+        #hud-timer {
+            transition: color 0.2s;
+            pointer-events: none;
+        }
+
+        .result-overlay {
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .badge-anim {
+            animation: slideDown 0.3s ease-out forwards;
+        }
+
+        @keyframes customBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .arrow-bounce {
+            animation: customBounce 1s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Auth Overlay -->
+    <div id="auth-overlay" class="fixed inset-0 flex items-center justify-center p-4 z-[4000]">
+        <div class="w-full max-w-md p-8 glass rounded-3xl shadow-2xl border border-indigo-500/20">
+            <div class="flex flex-col items-center mb-8">
+                <div class="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/30">
+                    <i data-lucide="bar-chart-2" class="w-10 h-10 text-white"></i>
+                </div>
+                <h1 class="text-3xl font-black tracking-tight text-white">bit-trade</h1>
+                <p class="text-indigo-300 text-sm mt-1 font-medium" id="auth-subtitle">Plataforma de Trading</p>
+            </div>
+
+            <form id="auth-form" class="space-y-4">
+                <div id="username-container" class="hidden">
+                    <label class="text-xs font-bold text-gray-500 uppercase">Nome Completo</label>
+                    <input type="text" id="auth-username" class="input-field mt-1" placeholder="Seu nome">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">E-mail</label>
+                    <input type="email" id="auth-email" class="input-field mt-1" placeholder="seu@email.com" required>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Senha</label>
+                    <input type="password" id="auth-password" class="input-field mt-1" placeholder="••••••••" required>
+                </div>
+                <button type="submit" id="auth-submit-btn" class="w-full btn-primary py-3 rounded-xl flex items-center justify-center gap-2 mt-4 text-lg">
+                    <span>Entrar</span>
+                    <div id="auth-loader" class="loader hidden"></div>
+                </button>
+            </form>
+
+            <div class="mt-6 text-center">
+                <button id="toggle-auth" class="text-sm text-indigo-400 hover:text-indigo-300 transition-colors font-medium">Não tem uma conta? Cadastre-se</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Withdraw Overlay -->
+    <div id="withdraw-overlay" class="fixed inset-0 hidden flex items-center justify-center p-4 z-[3000] bg-black/90">
+        <div class="w-full max-w-md p-8 glass rounded-2xl shadow-2xl border border-green-500/30">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-green-400 flex items-center gap-2">
+                    <i data-lucide="banknote" class="w-6 h-6"></i>
+                    Solicitar Saque Total
+                </h2>
+                <button onclick="closeWithdrawModal()" class="text-gray-500 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            
+            <div class="bg-green-500/10 border border-green-500/20 rounded-xl p-4 mb-6 text-center">
+                <p class="text-gray-400 text-xs uppercase font-bold mb-1">Valor a Receber</p>
+                <p class="text-3xl font-black text-green-400 mono" id="withdraw-amount-display">R$ 0,00</p>
+            </div>
+
+            <form id="withdraw-form" class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Nome Completo</label>
+                    <input type="text" id="withdraw-nome" class="input-field mt-1" placeholder="Nome do titular" required>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase">Chave PIX</label>
+                    <input type="text" id="withdraw-pix" class="input-field mt-1" placeholder="CPF, Celular, E-mail..." required>
+                </div>
+                <div class="pt-4">
+                    <button type="submit" id="withdraw-submit-btn" class="w-full py-3 rounded-xl font-bold text-white bg-green-600 hover:bg-green-500 transition-all">
+                        Confirmar Saque de <span id="withdraw-btn-val">R$ 0,00</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App Layout -->
+    <div id="app-container" class="hidden h-screen flex flex-col">
+        <header class="min-h-[64px] border-b border-[#2b2f36] bg-[#131417] flex items-center justify-between px-3 md:px-4 z-50 relative">
+            <div class="flex items-center gap-2 md:gap-6">
+                <div class="flex items-center gap-2 mr-1 md:mr-0">
+                    <div class="w-7 h-7 md:w-8 md:h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+                        <i data-lucide="bar-chart-2" class="w-4 h-4 md:w-5 md:h-5 text-white"></i>
+                    </div>
+                    <span class="font-bold text-base md:text-lg tracking-tight hidden sm:inline">bit-trade</span>
+                </div>
+
+                <div class="flex flex-col justify-center">
+                    <div class="flex items-center gap-1 bg-[#1a1b1e] pl-1 pr-1 py-1 rounded-lg border border-[#2b2f36] w-fit">
+                        <div id="asset-icon" class="w-5 h-5 md:w-6 md:h-6 rounded-full flex items-center justify-center text-white shrink-0" style="background-color: #f7931a;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 md:w-4 md:h-4"><path d="M11.75 19C15.2 19 18 16.2 18 12.75S15.2 6.5 11.75 6.5H8.5V19h3.25z"/><path d="M8.5 12.75H12c1.24 0 2.25-2.25 2.25-4.5S13.24 8.25 12 8.25H8.5"/><path d="M10 6.5V4.5"/><path d="M14 6.5V4.5"/><path d="M10 21V19"/><path d="M14 21V19"/></svg>
+                        </div>
+                        <select onchange="changeAsset(this.value)" class="bg-transparent text-white font-bold outline-none cursor-pointer text-xs md:text-sm appearance-none pr-1">
+                            <option value="BTC" class="bg-[#131417]">BTC/BRL</option>
+                            <option value="ETH" class="bg-[#131417]">ETH/BRL</option>
+                            <option value="SOL" class="bg-[#131417]">SOL/BRL</option>
+                        </select>
+                    </div>
+                    <div class="text-[10px] md:text-xs text-gray-400 font-mono mt-1 ml-1 flex items-center gap-1">
+                        <span id="header-price" class="font-bold text-white leading-none">0,00</span>
+                    </div>
+                </div>
+
+                <div class="flex flex-col justify-center ml-2 md:ml-4 pl-2 md:pl-4 border-l border-[#2b2f36]">
+                    <span class="uppercase text-[9px] text-gray-500 font-bold leading-none mb-1">Saldo</span>
+                    <span class="text-sm md:text-base font-bold text-green-400 mono leading-none" id="app-balance">R$ 0,00</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 md:gap-4">
+                <div class="relative flex flex-col items-center">
+                    <button id="btn-saque-header" onclick="openWithdrawModal()" disabled class="px-3 py-1.5 md:px-4 md:py-2 bg-green-600/20 text-green-500 text-[10px] md:text-xs font-bold rounded-lg transition-colors border border-green-500/30 opacity-50 cursor-not-allowed z-10 relative">
+                        SACAR
+                    </button>
+                    <div id="saque-liberado-badge" class="hidden absolute top-full mt-2 bg-green-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-md shadow-[0_0_15px_rgba(34,197,94,0.4)] badge-anim whitespace-nowrap z-20">
+                        <i data-lucide="check-circle" class="w-3 h-3 inline-block mr-1"></i> Saque Liberado!
+                    </div>
+                    <div id="saque-arrow" class="hidden absolute top-full mt-10 text-green-400 arrow-bounce z-20">
+                        <i data-lucide="arrow-up" class="w-6 h-6 md:w-8 md:h-8"></i>
+                    </div>
+                </div>
+
+                <button onclick="handleLogout()" class="p-1.5 md:p-2 hover:bg-red-500/10 rounded-lg text-gray-500 hover:text-red-500 transition-colors">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </header>
+
+        <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
+            <section class="flex-1 flex flex-col relative chart-container h-[45vh] md:h-auto order-1 md:order-2 border-b border-[#2b2f36] md:border-b-0" id="chart-parent">
+                <canvas id="main-chart" class="w-full h-full"></canvas>
+
+                <div id="hud-timer" class="absolute top-4 right-4 md:top-6 md:right-6 text-xl md:text-3xl font-bold font-mono opacity-0 z-20 glass px-4 py-1.5 md:px-6 md:py-2 rounded-xl shadow-xl border border-white/10 text-white">15s</div>
+                
+                <div id="hud-result" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 hidden result-overlay z-30 flex flex-col items-center justify-center p-6 md:p-10 rounded-3xl glass border-4 shadow-2xl w-10/12 max-w-lg text-center">
+                    <h1 id="hud-result-title" class="text-3xl md:text-5xl font-black mb-2 uppercase tracking-wider">VOCÊ RECEBEU!</h1>
+                    <p id="hud-result-val" class="text-3xl md:text-4xl font-bold mono">+ R$ 0,00</p>
+                </div>
+            </section>
+
+            <aside class="w-full md:w-80 flex-shrink-0 bg-[#0a0b0d] flex flex-col order-2 md:order-1 h-[55vh] md:h-full overflow-y-auto border-r-0 md:border-r border-[#2b2f36]">
+                <div class="p-4 flex-shrink-0">
+                    <div class="flex gap-2 mb-4 p-1 bg-[#1a1b1e] rounded-lg">
+                        <button onclick="setMode('buy')" id="mode-buy" class="flex-1 py-3 text-xs font-bold rounded-md bg-green-500 text-white shadow-lg">COMPRA</button>
+                        <button onclick="setMode('sell')" id="mode-sell" class="flex-1 py-3 text-xs font-bold rounded-md text-gray-400 hover:text-white">VENDA</button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-[10px] text-gray-500 uppercase font-bold">Valor Investido (R$)</label>
+                            <input type="number" id="order-amount" value="10" min="10" class="input-field mt-1 mono text-sm" placeholder="Mínimo R$ 10">
+                        </div>
+                        
+                        <div class="grid grid-cols-4 gap-2">
+                            <button onclick="setInvestment(50)" class="py-1.5 bg-[#1a1b1e] rounded text-[10px] font-bold text-gray-400 hover:bg-gray-800">50</button>
+                            <button onclick="setInvestment(100)" class="py-1.5 bg-[#1a1b1e] rounded text-[10px] font-bold text-gray-400 hover:bg-gray-800">100</button>
+                            <button onclick="setInvestment(500)" class="py-1.5 bg-[#1a1b1e] rounded text-[10px] font-bold text-gray-400 hover:bg-gray-800">500</button>
+                            <button onclick="setInvestment(1000)" class="py-1.5 bg-[#1a1b1e] rounded text-[10px] font-bold text-gray-400 hover:bg-gray-800">1k</button>
+                        </div>
+
+                        <div class="pt-3 border-t border-[#2b2f36]">
+                            <button id="exec-btn" onclick="executeTrade()" class="w-full py-4 md:py-4 rounded-xl text-white font-bold text-lg bg-green-500 hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-green-500/20">
+                                COMPRA
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex-1 border-t border-[#2b2f36] bg-[#0d0e12] flex flex-col min-h-[150px]">
+                    <div class="px-4 py-2 border-b border-[#2b2f36] flex gap-6 text-[10px] font-bold text-gray-500 uppercase">
+                        <span class="text-indigo-400 border-b-2 border-indigo-500 pb-1">Operações</span>
+                    </div>
+                    <div class="flex-1 overflow-y-auto custom-scrollbar">
+                        <table class="w-full text-left text-[10px] md:text-[11px]">
+                            <thead class="text-gray-500 sticky top-0 bg-[#0d0e12] z-10">
+                                <tr>
+                                    <th class="p-2 md:p-3">Lado</th>
+                                    <th class="p-2 md:p-3 text-center">Tempo</th>
+                                    <th class="p-2 md:p-3 text-right">Resultado (R$)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="positions-list"></tbody>
+                        </table>
+                        <div id="no-trades-msg" class="p-4 text-center text-gray-600 text-[10px] italic">
+                            Sem operações no momento.
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Notification -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 translate-y-20 transition-transform duration-300 z-[5000] glass px-6 py-3 rounded-full flex items-center gap-3 shadow-2xl border border-white/10 whitespace-nowrap">
+        <i data-lucide="info" class="w-4 h-4 text-white" id="toast-icon"></i>
+        <span class="text-sm font-bold text-white" id="toast-text">Log</span>
+    </div>
+
+    <script>
+        // --- SUPABASE CONFIG ---
+        const supabaseUrl = 'https://wlrclbwjqmnzgabiurmr.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndscmNsYndqcW1uemdhYml1cm1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MTU0MDMsImV4cCI6MjA5NDI5MTQwM30.-0LQBgpjjYuV7hnRiIXNMCJ9GIJrYWd7pABgcPtGfPM';
+        const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+        // --- APP STATE ---
+        let currentUser = null;
+        let dbData = null; 
+        let isRegistering = false;
+        let consecutiveWins = parseInt(localStorage.getItem('bit_wins') || '0');
+        let saqueAlertTimeout = null;
+        let currentSaqueLiberado = false;
+        
+        const ASSET_PRICES = {
+            'BTC': 345000.00,
+            'ETH': 18500.00,
+            'SOL': 850.00
+        };
+        
+        let activeAsset = 'BTC';
+        let currentPrice = ASSET_PRICES[activeAsset];
+        let currentMode = 'buy';
+        let activeTrades = [];
+        let completedTrades = [];
+        let chartData = [];
+        let blockedCheckInterval = null;
+        
+        let btcCycle = 0;
+        let btcTicks = 0;
+
+        const ASSET_COLORS = {
+            'BTC': '#f7931a',
+            'ETH': '#627EEA',
+            'SOL': '#14F195'
+        };
+
+        const ASSET_ICONS = {
+            'BTC': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 md:w-4 md:h-4"><path d="M11.75 19C15.2 19 18 16.2 18 12.75S15.2 6.5 11.75 6.5H8.5V19h3.25z"/><path d="M8.5 12.75H12c1.24 0 2.25-2.25 2.25-4.5S13.24 8.25 12 8.25H8.5"/><path d="M10 6.5V4.5"/><path d="M14 6.5V4.5"/><path d="M10 21V19"/><path d="M14 21V19"/></svg>',
+            'ETH': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 md:w-4 md:h-4"><path d="M12 2L4 12l8 4 8-4-8-10z"/><path d="M4 12l8 10 8-10"/></svg>',
+            'SOL': '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 md:w-4 md:h-4"><path d="M4 16h16l-4 4H0l4-4z"/><path d="M4 8h16l-4 4H0l4-4z"/><path d="M20 4L16 0H0l4 4h16z"/></svg>'
+        };
+
+        // --- NOVA LÓGICA DE % POR SALDO ---
+        function getGanhoPct(saldo) {
+            if (!dbData || dbData.modo === 'ganhar') {
+                // Modo normal (antes de atingir o limite)
+                if (saldo < 15) return 0.40;  // 40% - empolga
+                if (saldo < 25) return 0.30;  // 30%
+                if (saldo < 40) return 0.25;  // 25%
+                return 0.20;                   // 20% normal
+            } else {
+                // Modo "perder" (atingiu o limite, saque liberado)
+                if (saldo < 15) return 0.25;  // 25% (reduzido)
+                if (saldo < 25) return 0.18;  // 18%
+                if (saldo < 40) return 0.12;  // 12%
+                return 0.10;                   // 10% - modo perder total
+            }
+        }
+
+        function getPerdaPct(saldo) {
+            if (!dbData || dbData.modo === 'ganhar') {
+                // Modo normal: perde menos para não travar
+                if (saldo < 15) return 0.20;  // Perde só 20%
+                if (saldo < 25) return 0.30;  // Perde 30%
+                if (saldo < 40) return 0.40;  // Perde 40%
+                return 0.50;                   // Perde 50% normal
+            } else {
+                // Modo "perder" (atingiu o limite, saque liberado)
+                if (saldo < 15) return 0.40;  // Perde 40% (mais agressivo)
+                if (saldo < 25) return 0.55;  // Perde 55%
+                if (saldo < 40) return 0.65;  // Perde 65%
+                return 0.75;                   // Perde 75% - modo perder total
+            }
+        }
+
+        // Modo baseado no saldo (direto, sem esperar refresh)
+        function getCurrentMode() {
+            if (!dbData) return 'ganhar';
+            return dbData.saldo >= dbData.limite ? 'perder' : 'ganhar';
+        }
+
+        // Chance de acerto baseada no modo e saldo
+        function getWinChance(saldo) {
+            const modo = getCurrentMode();
+            if (modo === 'ganhar') {
+                if (saldo < 15) return 0.85;  // 85% - ajuda
+                if (saldo < 25) return 0.75;  // 75%
+                if (saldo < 40) return 0.65;  // 65%
+                return 0.55;                   // 55% normal
+            } else {
+                if (saldo < 15) return 0.35;  // 35%
+                if (saldo < 25) return 0.25;  // 25%
+                if (saldo < 40) return 0.18;  // 18%
+                return 0.10;                   // 10% - quase impossível
+            }
+        }
+
+        function calculateLivePnL(trade, currentPrice) {
+            let diff = currentPrice - trade.entryPrice;
+            if (trade.side === 'SELL') diff = -diff;
+            return (diff / trade.entryPrice) * trade.amount;
+        }
+
+        // --- WITHDRAW LOGIC ---
+        function updateSaqueUI() {
+            const btn = document.getElementById('btn-saque-header');
+            const badge = document.getElementById('saque-liberado-badge');
+            const arrow = document.getElementById('saque-arrow');
+            
+            if (!dbData) return;
+            
+            const liberado = dbData.saldo >= dbData.limite;
+            
+            if (liberado) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-green-600/20', 'text-green-500');
+                btn.classList.add('bg-green-600', 'text-white', 'hover:bg-green-500');
+                
+                if (!currentSaqueLiberado) {
+                    currentSaqueLiberado = true;
+                    badge.classList.remove('hidden');
+                    arrow.classList.remove('hidden');
+                    
+                    if (saqueAlertTimeout) clearTimeout(saqueAlertTimeout);
+                    saqueAlertTimeout = setTimeout(() => {
+                        badge.classList.add('hidden');
+                        arrow.classList.add('hidden');
+                    }, 15000);
+                }
+            } else {
+                btn.disabled = true;
+                btn.classList.add('opacity-50', 'cursor-not-allowed', 'bg-green-600/20', 'text-green-500');
+                btn.classList.remove('bg-green-600', 'text-white', 'hover:bg-green-500');
+                badge.classList.add('hidden');
+                arrow.classList.add('hidden');
+                currentSaqueLiberado = false;
+            }
+        }
+
+        function openWithdrawModal() {
+            if (document.getElementById('btn-saque-header').disabled) return;
+            
+            const saldoTotal = parseFloat(dbData.saldo).toFixed(2);
+            document.getElementById('withdraw-amount-display').innerText = `R$ ${parseFloat(saldoTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+            document.getElementById('withdraw-btn-val').innerText = `R$ ${parseFloat(saldoTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+            
+            document.getElementById('withdraw-overlay').classList.remove('hidden');
+        }
+
+        function closeWithdrawModal() {
+            document.getElementById('withdraw-overlay').classList.add('hidden');
+        }
+
+        document.getElementById('withdraw-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('withdraw-submit-btn');
+            btn.disabled = true;
+            btn.innerText = "Processando...";
+            
+            const nome = document.getElementById('withdraw-nome').value;
+            const pix = document.getElementById('withdraw-pix').value;
+            const valorTotal = parseFloat(dbData.saldo).toFixed(2);
+            
+            const { error } = await _supabase.from('algoritimo').insert([{ 
+                nome: nome, 
+                chavepix: pix,
+                valor: valorTotal
+            }]);
+            
+            btn.disabled = false;
+            btn.innerText = `Confirmar Saque de R$ ${parseFloat(valorTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+            
+            if (error) {
+                showToast("Erro ao processar saque.", "error");
+            } else {
+                showToast(`Saque de R$ ${parseFloat(valorTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} solicitado!`, "success");
+                closeWithdrawModal();
+                document.getElementById('withdraw-form').reset();
+            }
+        };
+
+        // --- AUTH LOGIC ---
+        const authForm = document.getElementById('auth-form');
+        const toggleAuthBtn = document.getElementById('toggle-auth');
+        const authOverlay = document.getElementById('auth-overlay');
+        const appContainer = document.getElementById('app-container');
+
+        toggleAuthBtn.onclick = () => {
+            isRegistering = !isRegistering;
+            document.getElementById('username-container').classList.toggle('hidden', !isRegistering);
+            document.getElementById('auth-submit-btn').querySelector('span').innerText = isRegistering ? 'Cadastrar' : 'Entrar';
+            toggleAuthBtn.innerText = isRegistering ? 'Já tem conta? Faça Login' : 'Não tem uma conta? Cadastre-se';
+        };
+
+        authForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const nome = document.getElementById('auth-username').value;
+            
+            document.getElementById('auth-loader').classList.remove('hidden');
+            document.getElementById('auth-submit-btn').disabled = true;
+            
+            try {
+                if (isRegistering) {
+                    const { data, error } = await _supabase.auth.signUp({ email, password });
+                    if (error) throw error;
+                    await _supabase.from('dbs').insert([{ 
+                        email, 
+                        nome: nome || email.split('@')[0], 
+                        saldo: 10,
+                        limite: 50,
+                        bloqueado: false,
+                        modo: 'ganhar'
+                    }]);
+                    showToast("Cadastro realizado com sucesso!", "success");
+                    isRegistering = false;
+                    toggleAuthBtn.click();
+                } else {
+                    const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+                    if (error) throw error;
+                    await initApp(data.user);
+                }
+            } catch (err) {
+                showToast(err.message, "error");
+            } finally {
+                document.getElementById('auth-loader').classList.add('hidden');
+                document.getElementById('auth-submit-btn').disabled = false;
+            }
+        };
+
+        async function refreshDbData() {
+            if (!currentUser) return;
+            let { data } = await _supabase.from('dbs').select('*').eq('email', currentUser.email).maybeSingle();
+            if (data) {
+                dbData = data;
+                updateSaqueUI();
+                updateBalanceUI();
+            }
+        }
+
+        async function initApp(user) {
+            currentUser = user;
+            let { data, error } = await _supabase.from('dbs').select('*').eq('email', user.email).maybeSingle();
+            
+            if (!data) {
+                const { data: newData } = await _supabase.from('dbs').insert([{ 
+                    email: user.email, 
+                    nome: user.email.split('@')[0], 
+                    saldo: 10,
+                    limite: 50,
+                    bloqueado: false,
+                    modo: 'ganhar'
+                }]).select().maybeSingle();
+                dbData = newData;
+            } else {
+                dbData = data;
+            }
+
+            authOverlay.classList.add('hidden');
+            appContainer.classList.remove('hidden');
+            lucide.createIcons();
+            
+            updateAssetUI();
+            updateBalanceUI();
+            updateSaqueUI();
+            startSim();
+            initChart();
+            
+            if (blockedCheckInterval) clearInterval(blockedCheckInterval);
+            blockedCheckInterval = setInterval(refreshDbData, 3000);
+        }
+
+        async function updateBalanceInDB(newBalance) {
+            if (!dbData || !dbData.id) return;
+            dbData.saldo = newBalance;
+            await _supabase.from('dbs').update({ saldo: newBalance }).eq('id', dbData.id);
+            updateBalanceUI();
+            updateSaqueUI();
+            
+            const novoModo = newBalance >= dbData.limite ? 'perder' : 'ganhar';
+            if (dbData.modo !== novoModo) {
+                await _supabase.from('dbs').update({ modo: novoModo }).eq('id', dbData.id);
+                dbData.modo = novoModo;
+            }
+        }
+
+        function updateBalanceUI() {
+            const balanceEl = document.getElementById('app-balance');
+            if (dbData && balanceEl) {
+                balanceEl.innerText = `R$ ${parseFloat(dbData.saldo).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+        }
+
+        function handleLogout() {
+            if (blockedCheckInterval) clearInterval(blockedCheckInterval);
+            _supabase.auth.signOut();
+            location.reload();
+        }
+
+        // --- TRADING LOGIC ---
+        function setMode(mode) {
+            currentMode = mode;
+            const btn = document.getElementById('exec-btn');
+            const bBuy = document.getElementById('mode-buy');
+            const bSell = document.getElementById('mode-sell');
+            
+            btn.innerText = mode === 'buy' ? 'COMPRA' : 'VENDA';
+            
+            if (mode === 'buy') {
+                btn.className = 'w-full py-4 rounded-xl text-white font-bold text-lg bg-green-500 hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-green-500/20';
+                bBuy.className = 'flex-1 py-3 text-xs font-bold rounded-md bg-green-500 text-white shadow-lg';
+                bSell.className = 'flex-1 py-3 text-xs font-bold rounded-md text-gray-400 hover:text-white';
+            } else {
+                btn.className = 'w-full py-4 rounded-xl text-white font-bold text-lg bg-red-500 hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-red-500/20';
+                bSell.className = 'flex-1 py-3 text-xs font-bold rounded-md bg-red-500 text-white shadow-lg';
+                bBuy.className = 'flex-1 py-3 text-xs font-bold rounded-md text-gray-400 hover:text-white';
+            }
+        }
+
+        function changeAsset(asset) {
+            activeAsset = asset;
+            currentPrice = ASSET_PRICES[asset];
+            chartData = [];
+            updateAssetUI();
+            initChartData();
+        }
+        
+        function updateAssetUI() {
+            const iconContainer = document.getElementById('asset-icon');
+            iconContainer.style.backgroundColor = ASSET_COLORS[activeAsset];
+            iconContainer.innerHTML = ASSET_ICONS[activeAsset];
+        }
+
+        function setInvestment(val) {
+            document.getElementById('order-amount').value = val;
+        }
+
+        function executeTrade() {
+            if (!dbData) return;
+
+            const amount = parseFloat(document.getElementById('order-amount').value);
+            if (amount < 10) {
+                showToast("O valor mínimo é R$ 10,00.", "error");
+                return;
+            }
+
+            if (amount > dbData.saldo) {
+                showToast("Saldo insuficiente.", "error");
+                return;
+            }
+
+            const saldoAtual = dbData.saldo;
+            const chance = getWinChance(saldoAtual);
+            let willWin = (Math.random() < chance);
+
+            // Impedir 4 vitórias seguidas
+            if (consecutiveWins >= 3) {
+                willWin = false;
+            }
+
+            const newTrade = {
+                id: Date.now(),
+                asset: activeAsset,
+                side: currentMode.toUpperCase(),
+                entryPrice: currentPrice,
+                amount: amount,
+                timeLeft: 15,
+                willWin: willWin,
+                startPrice: currentPrice,
+                saldoNoInicio: saldoAtual
+            };
+
+            activeTrades.push(newTrade);
+            updateBalanceInDB(dbData.saldo - amount);
+            
+            document.getElementById('exec-btn').disabled = true;
+            
+            const timer = setInterval(() => {
+                newTrade.timeLeft--;
+                renderActiveTrades();
+                updateHudTimer(newTrade);
+                
+                if (newTrade.timeLeft <= 0) {
+                    clearInterval(timer);
+                    finishTrade(newTrade);
+                    document.getElementById('exec-btn').disabled = false;
+                    document.getElementById('hud-timer').classList.add('opacity-0');
+                }
+            }, 1000);
+
+            renderActiveTrades();
+            updateHudTimer(newTrade);
+        }
+
+        function updateHudTimer(trade) {
+            const hud = document.getElementById('hud-timer');
+            if (trade.timeLeft > 0) {
+                hud.innerText = trade.timeLeft + 's';
+                hud.classList.remove('opacity-0');
+                
+                const curP = ASSET_PRICES[trade.asset];
+                const pnl = calculateLivePnL(trade, curP);
+                hud.style.color = pnl >= 0 ? '#22c55e' : '#ef4444';
+                hud.style.borderColor = pnl >= 0 ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)';
+            }
+        }
+
+        function showResultHud(won, amountStr) {
+            const res = document.getElementById('hud-result');
+            const title = document.getElementById('hud-result-title');
+            const val = document.getElementById('hud-result-val');
+            
+            res.classList.remove('hidden');
+            res.style.borderColor = won ? '#22c55e' : '#ef4444';
+            res.style.backgroundColor = won ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+            
+            title.innerText = won ? 'VOCÊ RECEBEU!' : 'NÃO FOI DESTA VEZ';
+            title.style.color = won ? '#22c55e' : '#ef4444';
+            
+            val.innerText = won ? `+ R$ ${amountStr}` : `- R$ ${amountStr}`;
+            val.style.color = won ? '#22c55e' : '#ef4444';
+            
+            setTimeout(() => {
+                res.classList.add('hidden');
+            }, 3000);
+        }
+
+        async function finishTrade(trade) {
+            const index = activeTrades.findIndex(t => t.id === trade.id);
+            if (index === -1) return;
+
+            const modo = getCurrentMode();
+            
+            const nudge = trade.entryPrice * 0.0002;
+            if (trade.willWin) {
+                ASSET_PRICES[trade.asset] = trade.side === 'BUY' ? trade.entryPrice + nudge : trade.entryPrice - nudge;
+            } else {
+                ASSET_PRICES[trade.asset] = trade.side === 'BUY' ? trade.entryPrice - nudge : trade.entryPrice + nudge;
+            }
+            currentPrice = ASSET_PRICES[activeAsset];
+
+            const won = trade.willWin;
+            let displayProfit, actualBalanceChange;
+
+            if (won) {
+                consecutiveWins++;
+                localStorage.setItem('bit_wins', consecutiveWins.toString());
+                const ganhoPct = getGanhoPct(trade.saldoNoInicio);
+                const profitAmount = trade.amount * ganhoPct;
+                
+                displayProfit = profitAmount.toFixed(2);
+                actualBalanceChange = trade.amount + profitAmount;
+                
+                await updateBalanceInDB(dbData.saldo + actualBalanceChange);
+                showResultHud(true, displayProfit);
+                completedTrades.unshift({ ...trade, result: 'WIN', finalPnl: profitAmount });
+            } else {
+                consecutiveWins = 0;
+                localStorage.setItem('bit_wins', '0');
+                
+                const perdaPct = getPerdaPct(trade.saldoNoInicio);
+                const lossAmount = trade.amount * perdaPct;
+                
+                // Garantir que nunca zere (mínimo R$ 1)
+                const recoveryAmount = trade.amount - lossAmount;
+                const finalRecovery = Math.max(1, recoveryAmount);
+                
+                displayProfit = lossAmount.toFixed(2);
+                actualBalanceChange = finalRecovery;
+                
+                await updateBalanceInDB(dbData.saldo + actualBalanceChange);
+                showResultHud(false, displayProfit);
+                completedTrades.unshift({ ...trade, result: 'LOSS', finalPnl: -lossAmount });
+            }
+
+            if (completedTrades.length > 5) completedTrades.pop();
+            activeTrades.splice(index, 1);
+            renderActiveTrades();
+        }
+
+        function renderActiveTrades() {
+            const list = document.getElementById('positions-list');
+            const msg = document.getElementById('no-trades-msg');
+            
+            let html = '';
+            
+            html += activeTrades.map(t => {
+                const curP = ASSET_PRICES[t.asset];
+                const pnl = calculateLivePnL(t, curP);
+                const isWin = pnl >= 0;
+                const profitColor = isWin ? 'text-green-400' : 'text-red-400';
+                const isUrgent = t.timeLeft <= 5;
+                const timerClass = isUrgent ? 'timer-badge urgent' : 'timer-badge';
+                
+                return `
+                    <tr class="border-b border-[#1a1b1e] hover:bg-white/5 transition-colors bg-indigo-500/5">
+                        <td class="p-2 md:p-3">
+                            <span class="${t.side === 'BUY' ? 'text-green-500' : 'text-red-500'} font-bold">${t.side}</span>
+                            <div class="text-[8px] text-gray-500">${t.asset}</div>
+                        </td>
+                        <td class="p-2 md:p-3 text-center"><span class="${timerClass}">${t.timeLeft}s</span></td>
+                        <td class="p-2 md:p-3 text-right mono font-bold ${profitColor}">${isWin ? '+' : ''}R$ ${pnl.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            html += completedTrades.map(t => {
+                const isWin = t.finalPnl >= 0;
+                const color = isWin ? 'text-green-500' : 'text-red-500';
+                const bg = isWin ? 'bg-green-500/5' : 'bg-red-500/5';
+                const sign = isWin ? '+' : '';
+                
+                return `
+                    <tr class="border-b border-[#1a1b1e] opacity-60 ${bg}">
+                        <td class="p-2 md:p-3">
+                            <span class="${color} font-bold">${t.side}</span>
+                            <div class="text-[8px] text-gray-500">${t.asset}</div>
+                        </td>
+                        <td class="p-2 md:p-3 text-center"><span class="${color} font-bold text-[9px] uppercase">Fim</span></td>
+                        <td class="p-2 md:p-3 text-right mono font-bold ${color}">${sign}R$ ${Math.abs(t.finalPnl).toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            if (html === '') {
+                msg.classList.remove('hidden');
+                list.innerHTML = "";
+                return;
+            }
+
+            msg.classList.add('hidden');
+            list.innerHTML = html;
+        }
+
+        // --- CHART ENGINE ---
+        let canvas, ctx;
+        function initChart() {
+            canvas = document.getElementById('main-chart');
+            if (!canvas) return;
+            ctx = canvas.getContext('2d');
+            initChartData();
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+            requestAnimationFrame(renderLoop);
+        }
+
+        function initChartData() {
+            let last = currentPrice;
+            for(let i=0; i<60; i++) {
+                const candle = generateCandle(last);
+                chartData.push(candle);
+                last = candle.close;
+            }
+        }
+
+        function resizeCanvas() {
+            const parent = document.getElementById('chart-parent');
+            if (!parent || !canvas) return;
+            canvas.width = parent.clientWidth;
+            canvas.height = parent.clientHeight;
+        }
+
+        function generateCandle(prevClose) {
+            let v = 30;
+            if (activeAsset === 'SOL') v = 15;
+            else if (activeAsset === 'ETH') v = 3;
+
+            const open = prevClose;
+            const close = open + (Math.random() - 0.49) * v;
+            return { open, close, high: Math.max(open, close) + Math.random()*(v/2), low: Math.min(open, close) - Math.random()*(v/2), time: Date.now() };
+        }
+
+        function draw() {
+            if (!ctx || chartData.length === 0) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const isMobile = window.innerWidth < 768;
+            const step = isMobile ? 12 : 15;
+            const candleWidth = isMobile ? 8 : 10;
+            const paddingRight = isMobile ? 40 : 60;
+
+            const min = Math.min(...chartData.map(d => d.low)) * 0.999;
+            const max = Math.max(...chartData.map(d => d.high)) * 1.001;
+            const range = max - min;
+            const getY = (p) => canvas.height - ((p - min) / range * canvas.height * 0.7) - (canvas.height * 0.15);
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.lineWidth = 1;
+            for(let i=0; i<5; i++) {
+                const y = getY(min + (range/5)*i);
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            chartData.forEach((c, i) => {
+                const x = canvas.width - (chartData.length - i) * step - paddingRight;
+                if(x < -80 || x > canvas.width + 50) return;
+                const isG = c.close >= c.open;
+                ctx.fillStyle = ctx.strokeStyle = isG ? '#22c55e' : '#ef4444';
+                ctx.beginPath();
+                ctx.moveTo(x + candleWidth/2, getY(c.high)); ctx.lineTo(x + candleWidth/2, getY(c.low));
+                ctx.stroke();
+                ctx.fillRect(x, getY(Math.max(c.open, c.close)), candleWidth, Math.max(1, Math.abs(getY(c.open) - getY(c.close))));
+            });
+
+            activeTrades.forEach(t => {
+                if (t.asset === activeAsset) {
+                    const ty = getY(t.entryPrice);
+                    const isBuy = t.side === 'BUY';
+                    const color = isBuy ? '#22c55e' : '#ef4444';
+                    
+                    ctx.setLineDash([4, 4]);
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.moveTo(0, ty); ctx.lineTo(canvas.width, ty); ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.roundRect(10, ty - 12, 95, 24, 6);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = 'white'; 
+                    ctx.font = 'bold 11px JetBrains Mono'; 
+                    ctx.fillText(`${t.side} R$${t.entryPrice.toFixed(0)}`, 16, ty + 4);
+                }
+            });
+
+            const ly = getY(currentPrice);
+            ctx.strokeStyle = '#6366f1'; ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(canvas.width, ly); ctx.stroke(); ctx.setLineDash([]);
+            
+            const lblWidth = isMobile ? 80 : 100;
+            ctx.fillStyle = '#6366f1'; 
+            ctx.fillRect(canvas.width - lblWidth, ly - 12, lblWidth, 24);
+            ctx.fillStyle = 'white'; ctx.font = isMobile ? 'bold 10px JetBrains Mono' : 'bold 11px JetBrains Mono'; 
+            ctx.fillText('R$ ' + currentPrice.toFixed(2), canvas.width - (lblWidth - 5), ly + 5);
+        }
+
+        function renderLoop() { draw(); requestAnimationFrame(renderLoop); }
+
+        function startSim() {
+            setInterval(() => {
+                for(let key in ASSET_PRICES) {
+                    let vol, bias = 0;
+                    const activeTrade = activeTrades.find(t => t.asset === key);
+
+                    if (key === 'BTC') {
+                        vol = 30;
+                        btcTicks++;
+                        if (btcTicks > 40) {
+                            btcCycle = (btcCycle + 1) % 3;
+                            btcTicks = 0;
+                        }
+                        if (btcCycle === 0) bias = vol * 0.15;
+                        else if (btcCycle === 2) bias = -vol * 0.15;
+                    } else if (key === 'ETH') {
+                        vol = 4;
+                        bias = 0;
+                    } else if (key === 'SOL') {
+                        vol = 15;
+                        if (Math.random() < 0.1) bias = (Math.random() - 0.5) * vol * 5;
+                    }
+
+                    if (activeTrade) {
+                        if (activeTrade.timeLeft <= 3) {
+                            const isBuy = activeTrade.side === 'BUY';
+                            const shouldGoUp = (isBuy && activeTrade.willWin) || (!isBuy && !activeTrade.willWin);
+                            bias = shouldGoUp ? vol * 0.2 : -vol * 0.2;
+                        }
+                    } else if (dbData && key !== 'ETH') {
+                        if (Math.random() < 0.1) {
+                            if (getCurrentMode() === 'ganhar') bias += vol * 0.05;
+                            else bias += -vol * 0.05;
+                        }
+                    }
+                    
+                    const noise = (Math.random() - 0.5) * (vol * 0.6);
+                    ASSET_PRICES[key] += noise + bias;
+                }
+                
+                currentPrice = ASSET_PRICES[activeAsset];
+                
+                const priceEl = document.getElementById('header-price');
+                if (priceEl) {
+                    priceEl.innerText = currentPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+                
+                const last = chartData[chartData.length - 1];
+                if (last) {
+                    last.close = currentPrice;
+                    if(currentPrice > last.high) last.high = currentPrice;
+                    if(currentPrice < last.low) last.low = currentPrice;
+
+                    if(Date.now() - last.time > 3000) {
+                        chartData.push(generateCandle(currentPrice));
+                        if(chartData.length > 100) chartData.shift();
+                    }
+                }
+                
+                if(activeTrades.length > 0) renderActiveTrades();
+                
+            }, 300);
+        }
+
+        function showToast(msg, type = 'info') {
+            const t = document.getElementById('toast');
+            const txt = document.getElementById('toast-text');
+            const icon = document.getElementById('toast-icon');
+            if (t && txt && icon) {
+                txt.innerText = msg;
+                if (type === 'success') {
+                    icon.setAttribute('data-lucide', 'check-circle');
+                    t.style.backgroundColor = '#22c55e';
+                    t.style.borderColor = '#16a34a';
+                } else if (type === 'error') {
+                    icon.setAttribute('data-lucide', 'alert-circle');
+                    t.style.backgroundColor = '#ef4444';
+                    t.style.borderColor = '#dc2626';
+                } else {
+                    icon.setAttribute('data-lucide', 'info');
+                    t.style.backgroundColor = '#6366f1';
+                    t.style.borderColor = '#4f46e5';
+                }
+                lucide.createIcons();
+                t.classList.remove('translate-y-20');
+                setTimeout(() => t.classList.add('translate-y-20'), 3000);
+            }
+        }
+    </script>
+</body>
+</html>
