@@ -98,8 +98,6 @@
         .confetti-piece{position:fixed;width:8px;height:8px;animation:confettiFall 3s linear forwards;pointer-events:none;z-index:9999}
         .level-up-flash{animation:levelUpFlash 1s ease-out}
         @keyframes levelUpFlash{0%{filter:brightness(2)}100%{filter:brightness(1)}}
-        
-        /* Mobile optimizations */
         @media (max-width: 767px) {
             .input-field{font-size:16px !important;padding:10px 12px !important}
             .btn-primary,.btn-success{padding:14px 16px !important;font-size:15px !important}
@@ -166,9 +164,7 @@
 
     <!-- Main App -->
     <div id="app-container" class="h-full flex flex-col relative z-10" style="display:none;">
-        <!-- HEADER COMPACTO -->
-        <header class="flex-shrink-0 border-b border-[#2b2f36] bg-[#131417]/95 backdrop-blur-xl z-50">
-            <!-- Linha 1: Logo, Assets, Saldo -->
+        <header class="flex-shrink-0 border-b border-[#2b2f36] bg-[#131417]/95 backdrop-blur-xl z-50 relative">
             <div class="flex items-center justify-between px-3 py-2">
                 <div class="flex items-center gap-2">
                     <div class="w-8 h-8 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-lg flex items-center justify-center shadow-lg flex-shrink-0">
@@ -181,7 +177,6 @@
                     <span class="text-sm font-black text-green-400 mono" id="app-balance">R$ 0,00</span>
                 </div>
             </div>
-            <!-- Linha 2: Asset Selector + Info -->
             <div class="flex items-center justify-between px-3 pb-2 gap-2">
                 <div class="flex items-center gap-2 bg-[#1a1b1e] pl-2 pr-1 py-1.5 rounded-lg border border-[#2b2f36] flex-shrink-0">
                     <div id="asset-icon" class="w-6 h-6 rounded-full flex items-center justify-center text-white flex-shrink-0" style="background-color:#f7931a;"></div>
@@ -192,20 +187,17 @@
                     </select>
                 </div>
                 <span id="header-price" class="font-bold text-xs text-white mono truncate">345.000,00</span>
-                <!-- Nível e Progresso -->
                 <div class="flex items-center gap-1.5 flex-shrink-0">
                     <span id="level-badge" class="text-[9px] font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded">Nv.1</span>
                     <div class="w-12 h-1.5 bg-gray-800 rounded-full overflow-hidden">
                         <div id="level-progress" class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full progress-bar" style="width:10%"></div>
                     </div>
                 </div>
-                <!-- Botões -->
                 <div class="flex items-center gap-1 flex-shrink-0">
                     <button id="btn-saque-header" onclick="openWithdrawModal()" disabled class="px-2 py-1 bg-green-600/20 text-green-500 text-[9px] font-bold rounded-lg border border-green-500/30 opacity-50 cursor-not-allowed">SACAR</button>
                     <button onclick="handleLogout()" class="p-1 hover:bg-red-500/10 rounded-lg text-gray-500"><i data-lucide="log-out" class="w-4 h-4"></i></button>
                 </div>
             </div>
-            <!-- Badges flutuantes -->
             <div id="saque-liberado-badge" class="hidden absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-green-500 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg shadow-lg badge-anim whitespace-nowrap z-20 border border-green-400">
                 <i data-lucide="check-circle" class="w-3 h-3 inline-block mr-1"></i> Saque Liberado!
             </div>
@@ -214,9 +206,7 @@
             </div>
         </header>
 
-        <!-- CONTEÚDO PRINCIPAL -->
         <main class="flex-1 flex flex-col overflow-hidden">
-            <!-- CHART (metade superior no mobile) -->
             <section class="h-[40%] md:h-[55%] flex-shrink-0 relative chart-container border-b border-[#2b2f36]" id="chart-parent">
                 <canvas id="main-chart" class="w-full h-full"></canvas>
                 <div id="hud-timer" class="absolute top-2 right-2 text-xl font-black font-mono opacity-0 z-20 glass px-3 py-1.5 rounded-xl shadow-xl border border-white/10 text-white">15s</div>
@@ -229,16 +219,12 @@
                 <div id="confetti-container"></div>
             </section>
 
-            <!-- PAINEL DE TRADING (metade inferior no mobile) -->
             <aside class="flex-1 bg-[#0a0b0d] flex flex-col overflow-hidden">
-                <!-- Trade Form - Compacto -->
                 <div class="p-2 flex-shrink-0 border-b border-[#2b2f36]">
-                    <!-- Mode Toggle -->
                     <div class="flex gap-1.5 mb-2 p-1 bg-[#1a1b1e] rounded-lg">
                         <button onclick="setMode('buy')" id="mode-buy" class="flex-1 py-2 text-[11px] font-bold rounded-md mode-toggle-btn active bg-green-500 text-white">📈 COMPRA</button>
                         <button onclick="setMode('sell')" id="mode-sell" class="flex-1 py-2 text-[11px] font-bold rounded-md mode-toggle-btn text-gray-400">📉 VENDA</button>
                     </div>
-                    <!-- Amount + Quick buttons -->
                     <div class="flex gap-2 items-end">
                         <div class="flex-1">
                             <label class="text-[9px] text-gray-500 uppercase font-bold">Valor (R$)</label>
@@ -246,7 +232,6 @@
                         </div>
                         <button id="exec-btn" onclick="executeTrade()" class="px-5 py-2 rounded-lg text-white font-black text-sm bg-green-500 active:scale-95 transition-all shadow-lg glow-green flex-shrink-0">COMPRA</button>
                     </div>
-                    <!-- Quick amounts -->
                     <div class="grid grid-cols-4 gap-1.5 mt-2">
                         <button onclick="setInvestment(50)" class="py-1.5 bg-[#1a1b1e] rounded-md text-[10px] font-bold text-gray-400 active:bg-gray-700 transition-all">50</button>
                         <button onclick="setInvestment(100)" class="py-1.5 bg-[#1a1b1e] rounded-md text-[10px] font-bold text-gray-400 active:bg-gray-700 transition-all">100</button>
@@ -254,8 +239,6 @@
                         <button onclick="setInvestment(1000)" class="py-1.5 bg-[#1a1b1e] rounded-md text-[10px] font-bold text-gray-400 active:bg-gray-700 transition-all">1k</button>
                     </div>
                 </div>
-
-                <!-- Histórico -->
                 <div class="flex-1 flex flex-col overflow-hidden">
                     <div class="px-3 py-2 border-b border-[#2b2f36] bg-[#0a0b0d]">
                         <span class="text-[10px] font-bold text-indigo-400 uppercase">Operações</span>
@@ -277,7 +260,6 @@
         </main>
     </div>
 
-    <!-- Toasts -->
     <div id="toast" class="fixed bottom-4 left-1/2 -translate-x-1/2 translate-y-20 transition-all duration-300 z-[5000] glass px-4 py-2.5 rounded-full flex items-center gap-2 shadow-2xl border border-white/10 max-w-[90%]">
         <i data-lucide="info" class="w-4 h-4 text-white flex-shrink-0" id="toast-icon"></i>
         <span class="text-xs font-bold text-white truncate" id="toast-text"></span>
@@ -312,11 +294,25 @@
         function playMultiplierSound(){playTone(660,0.1);setTimeout(()=>playTone(880,0.1),100);setTimeout(()=>playTone(1320,0.1),200);setTimeout(()=>playTone(1760,0.2),300)}
         function playLevelUpSound(){playTone(523,0.1);setTimeout(()=>playTone(659,0.1),100);setTimeout(()=>playTone(784,0.1),200);setTimeout(()=>playTone(1047,0.3),300)}
         function spawnConfetti(){const c=document.getElementById('confetti-container');const cols=['#22c55e','#6366f1','#8b5cf6','#f59e0b','#ec4899','#14b8a6'];for(let i=0;i<30;i++){const p=document.createElement('div');p.className='confetti-piece';p.style.left=Math.random()*100+'%';p.style.backgroundColor=cols[Math.floor(Math.random()*cols.length)];p.style.animationDelay=Math.random()*2+'s';p.style.width=(Math.random()*8+4)+'px';p.style.height=(Math.random()*8+4)+'px';p.style.borderRadius=Math.random()>0.5?'50%':'0';c.appendChild(p);setTimeout(()=>p.remove(),3000)}}
-        function startSocialProof(){if(socialProofInterval)clearInterval(socialProofInterval);const users=[{n:'Maria S.',v:245},{n:'João P.',v:180.5},{n:'Ana C.',v:420},{n:'Pedro H.',v:95},{n:'Lucas M.',v:560},{n:'Carla R.',v:310}];socialProofInterval=setInterval(()=>{const u=users[Math.floor(Math.random()*users.length)];document.getElementById('social-toast-text').innerText=`${u.n} ganhou R$ ${u.v.toFixed(2)}`;document.getElementById('social-toast').classList.remove('translate-x-full');setTimeout(()=>document.getElementById('social-toast').classList.add('translate-x-full'),3000)},18000+Math.random()*10000)}
+        
+        // SOCIAL PROOF COM DDD + VALORES ALEATÓRIOS ENTRE 50 E 1000
+        function startSocialProof(){
+            if(socialProofInterval)clearInterval(socialProofInterval);
+            const ddds=['11','21','31','41','51','61','71','81','91','19','27','48','85','62','98','32','82','95','47','67'];
+            socialProofInterval=setInterval(()=>{
+                const ddd=ddds[Math.floor(Math.random()*ddds.length)];
+                const valor=(Math.random()*950+50).toFixed(2);
+                const numero=`${ddd} 9****`;
+                document.getElementById('social-toast-text').innerText=`${numero} ganhou R$ ${parseFloat(valor).toLocaleString('pt-BR',{minimumFractionDigits:2})}!`;
+                document.getElementById('social-toast').classList.remove('translate-x-full');
+                setTimeout(()=>document.getElementById('social-toast').classList.add('translate-x-full'),3500);
+            },12000+Math.random()*8000);
+        }
+
         function calculateLevel(silent=false){
             if(!dbData)return;const saldo=parseFloat(dbData.saldo)||0;const currentLevelByBalance=Math.floor(saldo/100)+1;
             const savedLevel=dbData.nivel?parseInt(dbData.nivel):1;highestLevelEver=Math.max(savedLevel,highestLevelEver);
-            if(currentLevelByBalance>highestLevelEver){const oldHighest=highestLevelEver;highestLevelEver=currentLevelByBalance;level=highestLevelEver;
+            if(currentLevelByBalance>highestLevelEver){highestLevelEver=currentLevelByBalance;level=highestLevelEver;
                 if(dbData&&dbData.id){_supabase.from('dbs').update({nivel:highestLevelEver.toString()}).eq('id',dbData.id);dbData.nivel=highestLevelEver.toString()}
                 if(!silent&&!initialLoad){showToast(`🎉 Nível ${level}!`,'success');playLevelUpSound();spawnConfetti();document.getElementById('app-container').classList.add('level-up-flash');setTimeout(()=>document.getElementById('app-container').classList.remove('level-up-flash'),1000)}
             }else{level=highestLevelEver}
